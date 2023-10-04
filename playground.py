@@ -6,6 +6,7 @@ import pandas as pd
 from deap import algorithms, base, creator, tools, gp
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+from sklearn.tree import DecisionTreeRegressor
 import MLBenchmarks.regression_datasets_loaders as rdl
 
 # Define protected division function to handle division by zero
@@ -52,10 +53,9 @@ toolbox.register("compile", gp.compile, pset=pset)
 
 # Define GP parameters
 population_size = 500
-generations = 1000
+generations = 500
 
-# Create the population
-population = toolbox.population(n=population_size)
+
 
 # Define the fitness function
 def evaluate_individual(individual, X_train, y_train):
@@ -64,12 +64,23 @@ def evaluate_individual(individual, X_train, y_train):
     mse = mean_squared_error(y_train, y_pred)
     return mse,
 
+# Function to limit tree depth
+def limit_depth(max_depth=5):
+    def condition(max_depth, current_depth):
+        return current_depth >= max_depth
+    return condition
+
 # Configure the genetic algorithm
 toolbox.register("evaluate", evaluate_individual, X_train=X_train, y_train=y_train)
 toolbox.register("select", tools.selTournament, tournsize=3)
 toolbox.register("mate", gp.cxOnePoint)
 toolbox.register("expr_mut", gp.genFull, min_=0, max_=3)
 toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
+toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=3, condition=limit_depth(5))
+
+
+# Create the population
+population = toolbox.population(n=population_size)
 
 # Run the genetic algorithm
 algorithms.eaSimple(population, toolbox, cxpb=0.7, mutpb=0.3, ngen=generations, verbose=True)
@@ -81,4 +92,11 @@ best_individual = tools.selBest(population, k=1)[0]
 best_func = toolbox.compile(expr=best_individual)
 y_pred_test = [best_func(*x) for x in X_test]
 mse_test = mean_squared_error(y_test, y_pred_test)
-print(f"Mean Squared Error on Test Set: {mse_test:.2f}")
+print(f"Mean Squared Error on Test Set GP: {mse_test:.2f}")
+
+
+t = DecisionTreeRegressor(max_depth=5)
+t.fit(X_train,y_train)
+t_pred = t.predict(X_test)
+
+print(f"Mean Squared Error on Test Set DT: { mean_squared_error(y_test, t_pred):.2f}")
