@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from sklearn.tree import DecisionTreeRegressor
 import MLBenchmarks.regression_datasets_loaders as rdl
+from sklearn.linear_model import LinearRegression
+from functools import partial
 
 # Define protected division function to handle division by zero
 def protected_div(left, right):
@@ -35,7 +37,7 @@ pset.addPrimitive(operator.sub, arity=2)
 pset.addPrimitive(operator.mul, arity=2)
 #pset.addPrimitive(protected_div, arity=2)
 #pset.addPrimitive(math.sqrt, arity=1)
-pset.addEphemeralConstant("rand_const", lambda: random.uniform(0, 1))
+#pset.addEphemeralConstant("rand_const", lambda: 1.0)
 pset.renameArguments(ARG0="cylinders")
 pset.renameArguments(ARG1="displacement")
 pset.renameArguments(ARG2="horsepower")
@@ -52,15 +54,23 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
 
 # Define GP parameters
-population_size = 100
+population_size = 10
 generations = 500
 
+
 # Define the fitness function
-def evaluate_individual(individual, X_train, y_train):
-    func = toolbox.compile(expr=individual)
-    y_pred = [func(*x) for x in X_train]
-    mse = mean_squared_error(y_train, y_pred)
-    return mse,
+def evaluate_individual(individuals, X_train, y_train):
+    # Create a matrix of features using the individuals in the population
+    features_matrix = np.array([toolbox.compile(expr=ind)(*x) for x, ind in zip(X_train, individuals)]).T
+
+    # Fit a linear regression model
+    regressor = LinearRegression()
+    regressor.fit(features_matrix, y_train)
+
+    # Calculate the fitness as the coefficients of the linear regression
+    fitness = regressor.coef_
+
+    return fitness,
 
 # Function to limit tree depth
 def limit_depth(max_depth=5):
@@ -82,6 +92,7 @@ population = toolbox.population(n=population_size)
 
 # Run the genetic algorithm
 algorithms.eaSimple(population, toolbox, cxpb=0.7, mutpb=0.3, ngen=generations, verbose=True)
+
 
 # Get the best individual from the population
 best_individual = tools.selBest(population, k=1)[0]
