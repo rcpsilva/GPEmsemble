@@ -41,12 +41,12 @@ def create_decision_tree_feature(X, model):
     return model.predict(X).reshape(-1, 1)
 
 
-n_features = 10
+n_features = 5
 feature_models = [None for _ in range(n_features)]
 selected_feature_models = [None for _ in range(n_features)]
 
 it = 0
-maxit = 200
+maxit = 1000
 quality = np.zeros(n_features)
 quality_selected = np.zeros(n_features)
 
