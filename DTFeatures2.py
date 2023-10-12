@@ -31,18 +31,18 @@ X, X_test, y, y_test = train_test_split(X, y, test_size=0.2)
 
 
 # Function to generate a decision tree feature on a random subset of data
-def create_decision_tree_feature(X, model):
+def create_decision_tree_feature(X, feature_model):
     #random_indices = np.random.choice(len(X), size=int(0.8 * len(X)), replace=True)
     #X_subset = X[random_indices]
     #y_subset = y[random_indices]
 
     #tree = DecisionTreeClassifier()
     #tree.fit(X_subset, y_subset)
-    return model.predict(X).reshape(-1, 1)
+    return feature_model['model'].predict(X[:,feature_model['feature_idxs']]).reshape(-1, 1)
 
 
-n_features = 4
-feature_models = [None for _ in range(n_features)]
+n_features = 10
+feature_models = [{'model':None,'feature_idxs':None} for _ in range(n_features)]
 selected_feature_models = [None for _ in range(n_features)]
 
 it = 0
@@ -53,19 +53,22 @@ quality_selected = np.zeros(n_features)
 for it in tqdm(range(maxit)): 
 
     # generate a set of feature models 
-    feature_models = [None for _ in range(n_features)]
+    feature_models = [{'model':None,'feature_idxs':None} for _ in range(n_features)]
     for i in range(n_features):
-        random_indices = np.random.choice(len(X), size=int(0.8 * len(X)), replace=True)
+        random_indices = np.random.permutation(X.shape[0])[0:(np.ceil(X.shape[0]*0.8).astype(int))]
         # allow random cols in the future
+        rand_features = np.random.permutation(X.shape[1])[0:np.ceil(np.log(X.shape[1])).astype(int)]
         X_subset = X[random_indices]
+        X_subset = X_subset[:,rand_features]
         y_subset = y[random_indices]
         tree = DecisionTreeClassifier(max_depth=2)
         tree.fit(X_subset,y_subset)
-        feature_models[i] = deepcopy(tree)
+        feature_models[i]['model'] = deepcopy(tree)
+        feature_models[i]['feature_idxs'] = rand_features
 
 
     # Create transformers for each decision tree feature
-    feature_transformers = [FunctionTransformer(create_decision_tree_feature, kw_args={"model": feature_models[i]}) for i in range(n_features)]
+    feature_transformers = [FunctionTransformer(create_decision_tree_feature, kw_args={"feature_model": feature_models[i]}) for i in range(n_features)]
 
     # Combine the features using FeatureUnion
     union = FeatureUnion(transformer_list=[("model_feature_{}".format(i), feature_transformer) 
@@ -93,16 +96,13 @@ for it in tqdm(range(maxit)):
     if (it == 0) or (it == (maxit - 1)):
         print(quality_selected)
 
-
-
-
 # Base Score
 base_model = RandomForestClassifier()
 base_model.fit(X,y)
 print(f"score original: {f1_score(y_test, base_model.predict(X_test),average='micro')}")
 
 # Create transformers for each decision tree feature
-feature_transformers = [FunctionTransformer(create_decision_tree_feature, kw_args={"model": selected_feature_models[i]}) for i in range(n_features)]
+feature_transformers = [FunctionTransformer(create_decision_tree_feature, kw_args={"feature_model": feature_models[i]}) for i in range(n_features)]
 # Combine the features using FeatureUnion
 union = FeatureUnion(transformer_list=[("model_feature_{}".format(i), feature_transformer) 
                                        for i, feature_transformer in enumerate(feature_transformers)])
