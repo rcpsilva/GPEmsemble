@@ -46,7 +46,7 @@ feature_models = [{'model':None,'feature_idxs':None} for _ in range(n_features)]
 selected_feature_models = [None for _ in range(n_features)]
 
 it = 0
-maxit = 10000
+maxit = 1000
 quality = np.zeros(n_features)
 quality_selected = np.zeros(n_features)
 
